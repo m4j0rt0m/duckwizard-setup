@@ -74,7 +74,7 @@ else
   fi
 fi
 
-# Step 5: Ensure the directory structure (src, tb, etc.)
+# Ensure the directory structure (src, tb, etc.)
 echo "[INFO] Checking required directory structure..."
 mkdir -p src/rtl src/include src/mem src/package
 mkdir -p tb/rtl tb/include tb/mem tb/package tb/scripts tb/cxx
@@ -90,7 +90,7 @@ echo "  - tb/package  (Used for testbench packages: .sv)"
 echo "  - tb/scripts  (Used for testbench scripts)"
 echo "  - tb/cxx      (Used for C++ files in testbenches)"
 
-# Step 6: Remove the cloned repository only if it was needed
+# Remove the cloned repository only if it was needed
 if [ $CLONED -eq 1 ]; then
   rm -rf duckwizard
   echo "[INFO] Cloned repository removed."
