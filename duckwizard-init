@@ -1,0 +1,99 @@
+#!/bin/bash
+
+# Function to check if the dummy rule from duckwizard Makefile runs
+check_duckwizard_inclusion() {
+  make check-duckwizard-inclusion > /dev/null 2>&1
+  return $?
+}
+
+# Function to compare directories
+check_for_differences() {
+  diff -qr "$1" "$2" > /dev/null
+  return $?
+}
+
+# Variable to track if the repository was cloned
+CLONED=0
+
+# Check if .duckwizard or project.config are missing, clone if necessary
+if [ ! -d ./.duckwizard ] || [ ! -f ./project.config ]; then
+  echo "[INFO] Either .duckwizard directory or project.config is missing. Cloning duckWizard..."
+  git clone https://github.com/m4j0rt0m/duckwizard.git || { echo "[ERROR] Failed to clone duckWizard"; exit 1; }
+  CLONED=1
+else
+  echo "[INFO] .duckwizard and project.config are present. Skipping clone."
+fi
+
+# Copy .duckwizard and project.config if missing
+if [ ! -d ./.duckwizard ]; then
+  echo "[INFO] .duckwizard directory missing. Copying from cloned duckWizard..."
+  cp -r duckwizard/.duckwizard ./.duckwizard
+  echo "[INFO] .duckwizard directory copied."
+fi
+if [ ! -f ./project.config ]; then
+  echo "[INFO] project.config missing. Copying project.config from .duckwizard..."
+  cp ./.duckwizard/project.config.orig ./project.config
+  echo "[INFO] project.config copied."
+fi
+
+# Check for differences between the current environment and the reference in the cloned duckWizard
+echo "[INFO] Checking for differences in the environment..."
+differences_found=0
+if check_for_differences ./.duckwizard duckwizard/.duckwizard; then
+  echo "[INFO] .duckwizard directory is up to date."
+else
+  echo "[INFO] Differences found in the .duckwizard directory."
+  differences_found=1
+fi
+if check_for_differences ./project.config duckwizard/.duckwizard/project.config.orig; then
+  echo "[INFO] project.config is up to date."
+else
+  echo "[INFO] Differences found in project.config."
+  differences_found=1
+fi
+
+# Suggest upgrade if differences are found
+if [ $differences_found -eq 1 ]; then
+  echo "[INFO] Some differences were found between the current environment and the reference."
+  echo "[INFO] You can run 'duckwizard-upgrade' to update the environment."
+fi
+
+# Check for Makefile and include directive
+if [ ! -f Makefile ]; then
+  echo "[INFO] No Makefile found. Creating a new Makefile..."
+  echo 'include ./.duckwizard/Makefile' > Makefile
+  echo "[INFO] Makefile created."
+else
+  echo "[INFO] Makefile already exists. Checking for duckwizard inclusion..."
+  if ! check_duckwizard_inclusion; then
+    echo "[INFO] The duckwizard Makefile is not included in the current Makefile."
+    echo "[INFO] Please ensure to add the following line to your Makefile:"
+    echo "  include ./.duckwizard/Makefile"
+  else
+    echo "[INFO] The duckwizard Makefile is included correctly."
+  fi
+fi
+
+# Step 5: Ensure the directory structure (src, tb, etc.)
+echo "[INFO] Checking required directory structure..."
+mkdir -p src/rtl src/include src/mem src/package
+mkdir -p tb/rtl tb/include tb/mem tb/package tb/scripts tb/cxx
+echo "[INFO] Directory structure set up:"
+echo "  - src/rtl     (Used for Verilog/SystemVerilog source files: .v, .sv)"
+echo "  - src/include (Used for header files: .h, .v, .vh, .sv, .svh)"
+echo "  - src/mem     (Used for memory initialization files: .bin, .hex)"
+echo "  - src/package (Used for SystemVerilog packages: .sv)"
+echo "  - tb/rtl      (Used for testbench Verilog/SystemVerilog source files: .v, .sv)"
+echo "  - tb/include  (Used for testbench headers: .h, .v, .vh, .sv, .svh)"
+echo "  - tb/mem      (Used for testbench memory initialization files: .bin, .hex)"
+echo "  - tb/package  (Used for testbench packages: .sv)"
+echo "  - tb/scripts  (Used for testbench scripts)"
+echo "  - tb/cxx      (Used for C++ files in testbenches)"
+
+# Step 6: Remove the cloned repository only if it was needed
+if [ $CLONED -eq 1 ]; then
+  rm -rf duckwizard
+  echo "[INFO] Cloned repository removed."
+fi
+
+echo "[INFO] Environment setup complete!"

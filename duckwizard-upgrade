@@ -1,0 +1,50 @@
+#!/bin/bash
+
+# Check for diff3 availability
+if ! command -v diff3 &> /dev/null; then
+  echo "[ERROR] diff3 is required but not installed. Please install diffutils."
+  exit 1
+fi
+
+# Check if duckWizard's environment directory exists
+if [ ! -d ./.duckwizard ]; then
+  echo "[ERROR] .duckwizard directory not found in the current directory."
+  exit 1
+fi
+
+# Back up the current project.config
+if [ -f ./project.config ]; then
+  cp ./project.config ./project.config.backup
+  echo "[INFO] Backed up the current project.config to project.config.backup"
+else
+  echo "[ERROR] project.config not found in the current directory."
+  exit 1
+fi
+
+# Check if project.config.orig exists inside .duckwizard for comparison
+if [ ! -f ./.duckwizard/project.config.orig ]; then
+  echo "[ERROR] project.config.orig not found in .duckwizard. Cannot perform the merge."
+  exit 1
+fi
+
+# project.config merge using diff3
+echo "[INFO] Merging project.config with the original version..."
+diff3 -m ./project.config ./.duckwizard/project.config.orig ./duckwizard/project.config > ./project.config.merged
+if [ $? -ne 0 ]; then
+  echo "[ERROR] Merge conflict detected. Please resolve conflicts in project.config.merged manually."
+  exit 1
+fi
+
+# Move the merged config file to replace the original project.config
+mv ./project.config.merged ./project.config
+echo "[INFO] Successfully merged project.config."
+
+# Update the .duckwizard directory from the latest version in duckwizard repo
+echo "[INFO] Updating .duckwizard directory..."
+cp -rf ./duckwizard/.duckwizard/* ./.duckwizard/
+
+# Clean up
+rm -f ./project.config.backup
+echo "[INFO] Cleaned up backup file."
+
+echo "[INFO] Environment upgrade complete!"
