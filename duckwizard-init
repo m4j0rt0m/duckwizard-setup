@@ -36,26 +36,41 @@ if [ ! -f ./project.config ]; then
   echo "[INFO] project.config copied."
 fi
 
-# Check for differences between the current environment and the reference in the cloned duckWizard
-echo "[INFO] Checking for differences in the environment..."
-differences_found=0
-if check_for_differences ./.duckwizard duckwizard/.duckwizard; then
-  echo "[INFO] .duckwizard directory is up to date."
-else
-  echo "[INFO] Differences found in the .duckwizard directory."
-  differences_found=1
-fi
-if check_for_differences ./project.config duckwizard/.duckwizard/project.config.orig; then
-  echo "[INFO] project.config is up to date."
-else
-  echo "[INFO] Differences found in project.config."
-  differences_found=1
+# If the repo wasn't cloned, ask if the user wants to clone and check for differences
+if [ $CLONED -eq 0 ]; then
+  read -p "[INFO] The repository was not cloned. Do you want to check if your environment is up-to-date by cloning the reference? (y/n) " check_up_to_date
+  check_up_to_date=${check_up_to_date:-n}
+  if [ "$check_up_to_date" = "y" ]; then
+    echo "[INFO] Cloning the repository to check for differences..."
+    git clone https://github.com/m4j0rt0m/duckwizard.git || { echo "[ERROR] Failed to clone duckWizard for checking."; exit 1; }
+    CLONED=1
+  else
+    echo "[INFO] Skipping the up-to-date check."
+  fi
 fi
 
-# Suggest upgrade if differences are found
-if [ $differences_found -eq 1 ]; then
-  echo "[INFO] Some differences were found between the current environment and the reference."
-  echo "[INFO] You can run 'duckwizard-upgrade' to update the environment."
+# Check for differences between the current environment and the reference in the cloned duckWizard
+if [ $CLONED -eq 1 ]; then
+  echo "[INFO] Checking for differences in the environment..."
+  differences_found=0
+  if check_for_differences ./.duckwizard duckwizard/.duckwizard; then
+    echo "[INFO] .duckwizard directory is up to date."
+  else
+    echo "[INFO] Differences found in the .duckwizard directory."
+    differences_found=1
+  fi
+  if check_for_differences ./project.config duckwizard/.duckwizard/project.config.orig; then
+    echo "[INFO] project.config is up to date."
+  else
+    echo "[INFO] Differences found in project.config."
+    differences_found=1
+  fi
+
+  # Suggest upgrade if differences are found
+  if [ $differences_found -eq 1 ]; then
+    echo "[INFO] Some differences were found between the current environment and the reference."
+    echo "[INFO] You can run 'duckwizard-upgrade' to update the environment."
+  fi
 fi
 
 # Check for Makefile and include directive
