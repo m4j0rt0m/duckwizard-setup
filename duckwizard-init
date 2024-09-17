@@ -2,7 +2,7 @@
 
 # Function to check if the dummy rule from duckwizard Makefile runs
 check_duckwizard_inclusion() {
-  make check-duckwizard-inclusion > /dev/null 2>&1
+  make check-duckwizard > /dev/null 2>&1
   return $?
 }
 
