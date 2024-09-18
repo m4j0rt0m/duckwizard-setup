@@ -1,50 +1,87 @@
 #!/bin/bash
 
-# Check for diff3 availability
-if ! command -v diff3 &> /dev/null; then
-  echo "[ERROR] diff3 is required but not installed. Please install diffutils."
-  exit 1
+# Save the current directory as a prefix and append a "/"
+CURRENT_DIR="$(pwd)/"
+
+# Function to check if a required tool is installed
+check_tool() {
+  if ! command -v "$1" &> /dev/null; then
+    echo "[ERROR] Required tool '$1' is not installed. Please install it and try again."
+    exit 1
+  fi
+}
+
+# Function to merge project.config with the new version
+merge_project_config() {
+  local orig_file="$1"
+  local current_file="$2"
+  local new_file="$3"
+
+  echo "[INFO] Merging project.config..."
+  # Use diff3 to merge the original, current, and new project.config
+  diff3 -m "$current_file" "$orig_file" "$new_file" > "${CURRENT_DIR}./merged_project.config"
+
+  if [ $? -eq 0 ]; then
+    echo "[INFO] Merge successful."
+    mv "${CURRENT_DIR}./merged_project.config" "$current_file"
+    # Remove the backup after successful merge
+    rm -f "${CURRENT_DIR}./project.config.backup"
+    echo "[INFO] Backup removed: project.config.backup"
+  else
+    echo "[WARNING] Merge conflicts detected. Please resolve them in merged_project.config."
+    echo "[INFO] The backup file 'project.config.backup' has been retained."
+  fi
+}
+
+# Check for required tools
+check_tool "git"
+check_tool "diff3"
+
+# Clone the latest duckWizard repository for the upgrade
+echo "[INFO] Fetching the latest version of duckWizard..."
+git clone https://github.com/m4j0rt0m/duckwizard.git "${CURRENT_DIR}./duckwizard-latest" || { echo "[ERROR] Failed to clone duckWizard."; exit 1; }
+cd "${CURRENT_DIR}./duckwizard-latest" || { echo "[ERROR] Failed to enter duckwizard-latest directory."; exit 1; }
+
+# If project.config.orig is missing, retrieve it from the commit hash
+if [ ! -f "${CURRENT_DIR}./.duckwizard/project.config.orig" ]; then
+  if [ ! -f "${CURRENT_DIR}./.duckwizard/COMMIT" ]; then
+    echo "[ERROR] ${CURRENT_DIR}./.duckwizard/COMMIT not found. Cannot retrieve specific commit for project.config.orig."
+    cd "${CURRENT_DIR}./" && rm -rf "${CURRENT_DIR}./duckwizard-latest"
+    exit 1
+  fi
+
+  # Retrieve the commit hash from COMMIT
+  commit_hash=$(cat "${CURRENT_DIR}./.duckwizard/COMMIT")
+  echo "[INFO] project.config.orig not found. Attempting to retrieve it from commit: $commit_hash"
+
+  # Checkout the specific commit to retrieve project.config.orig
+  git checkout "$commit_hash" || { echo "[ERROR] Failed to checkout commit $commit_hash."; cd "${CURRENT_DIR}./" && rm -rf "${CURRENT_DIR}./duckwizard-latest"; exit 1; }
+
+  # Copy the project.config from the specific commit into ./.duckwizard as project.config.orig
+  if [ -f "${CURRENT_DIR}./duckwizard-latest/project.config" ]; then
+    cp -f "${CURRENT_DIR}./duckwizard-latest/project.config" "${CURRENT_DIR}./.duckwizard/project.config.orig"
+    echo "[INFO] project.config.orig created from commit $commit_hash."
+  else
+    echo "[ERROR] project.config not found in the specified commit."
+    cd "${CURRENT_DIR}./" && rm -rf "${CURRENT_DIR}./duckwizard-latest"
+    exit 1
+  fi
+
+  # Switch back to the latest commit (master) to continue with the upgrade
+  git checkout master || { echo "[ERROR] Failed to switch back to the latest commit."; cd "${CURRENT_DIR}./" && rm -rf "${CURRENT_DIR}./duckwizard-latest"; exit 1; }
 fi
 
-# Check if duckWizard's environment directory exists
-if [ ! -d ./.duckwizard ]; then
-  echo "[ERROR] .duckwizard directory not found in the current directory."
-  exit 1
-fi
+# Backup the current project.config
+cp -f "${CURRENT_DIR}./project.config" "${CURRENT_DIR}./project.config.backup"
 
-# Back up the current project.config
-if [ -f ./project.config ]; then
-  cp ./project.config ./project.config.backup
-  echo "[INFO] Backed up the current project.config to project.config.backup"
-else
-  echo "[ERROR] project.config not found in the current directory."
-  exit 1
-fi
+# Merge project.config using diff3
+merge_project_config "${CURRENT_DIR}./.duckwizard/project.config.orig" "${CURRENT_DIR}./project.config" "${CURRENT_DIR}./duckwizard-latest/project.config"
 
-# Check if project.config.orig exists inside .duckwizard for comparison
-if [ ! -f ./.duckwizard/project.config.orig ]; then
-  echo "[ERROR] project.config.orig not found in .duckwizard. Cannot perform the merge."
-  exit 1
-fi
+# Now that project.config has been merged, update the .duckwizard directory with the latest files
+echo "[INFO] Updating the ./.duckwizard directory with the latest version..."
+cp -rf "${CURRENT_DIR}./duckwizard-latest/.duckwizard/"* "${CURRENT_DIR}./.duckwizard/"
 
-# project.config merge using diff3
-echo "[INFO] Merging project.config with the original version..."
-diff3 -m ./project.config ./.duckwizard/project.config.orig ./duckwizard/project.config > ./project.config.merged
-if [ $? -ne 0 ]; then
-  echo "[ERROR] Merge conflict detected. Please resolve conflicts in project.config.merged manually."
-  exit 1
-fi
+# Clean up the latest repository clone
+cd "${CURRENT_DIR}./" && rm -rf "${CURRENT_DIR}./duckwizard-latest"
 
-# Move the merged config file to replace the original project.config
-mv ./project.config.merged ./project.config
-echo "[INFO] Successfully merged project.config."
-
-# Update the .duckwizard directory from the latest version in duckwizard repo
-echo "[INFO] Updating .duckwizard directory..."
-cp -rf ./duckwizard/.duckwizard/* ./.duckwizard/
-
-# Clean up
-rm -f ./project.config.backup
-echo "[INFO] Cleaned up backup file."
-
-echo "[INFO] Environment upgrade complete!"
+echo "[INFO] Environment upgrade complete."
