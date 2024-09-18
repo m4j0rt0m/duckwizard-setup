@@ -1,5 +1,9 @@
 # duckWizard Setup
 
+<div align="center">
+  <img src="./logo.png" alt="duckWizard Logo" width="200"/>
+</div>
+
 `duckWizard-setup` provides easy-to-use scripts for initializing and upgrading the environment for projects that use the `duckWizard` framework. These scripts, `duckwizard-init` and `duckwizard-upgrade`, simplify the process of setting up and maintaining a consistent project structure across different platforms.
 
 ## Features
